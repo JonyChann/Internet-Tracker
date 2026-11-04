@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internet Tracker</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23202833'/%3E%3Cpath d='M8 21l5-6 4 3 7-9' stroke='%23fff' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <a class="brand" href="#/"><span class="brand-mark">◈</span><span>Internet Tracker</span></a>
+        <button class="icon-btn sm" id="mobile-close" title="收起">×</button>
+      </div>
+      <button class="new-table-btn" id="new-table">＋ 新建数据表</button>
+      <div class="nav-section">
+        <div class="nav-label">数据表</div>
+        <nav class="table-nav" id="table-nav"></nav>
+      </div>
+      <div class="nav-section nav-bottom">
+        <a class="nav-item" href="/export" id="nav-export"><span class="nav-icon">⇩</span><span class="nav-name">导出中心</span></a>
+        <a class="nav-item" href="#/settings" id="nav-settings"><span class="nav-icon">⚙</span><span class="nav-name">设置</span></a>
+      </div>
+      <div class="sidebar-foot" id="sidebar-foot"></div>
+    </aside>
+    <main class="main">
+      <div id="view"></div>
+    </main>
+  </div>
+  <button class="mobile-menu" id="mobile-menu" aria-label="打开菜单">☰</button>
+  <div id="modal-root"></div>
+  <div class="toast-root" id="toast-root"></div>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

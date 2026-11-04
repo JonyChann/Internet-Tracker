@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>导出 · Internet Tracker</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f6feb'/%3E%3Cpath d='M9 16h14M16 9v14' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+  <style>
+    .export-page { max-width: 940px; margin: 0 auto; padding: 40px 28px 72px; }
+    .export-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 28px; }
+    .export-brand { display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: -.01em; color: var(--ink); text-decoration: none; }
+    .export-brand .mark { width: 28px; height: 28px; border-radius: 8px; background: var(--ink); color: #fff; display: grid; place-items: center; font-size: 14px; }
+    .export-page h1 { font-size: 30px; letter-spacing: -.03em; margin: 0 0 6px; color: var(--ink); }
+    .export-page .lede { color: var(--muted); font-size: 13.5px; margin: 0 0 26px; line-height: 1.7; }
+    .export-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 22px 24px; margin-bottom: 18px; box-shadow: var(--shadow-sm); }
+    .export-card h3 { font-size: 14px; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+    .export-card h3 .step { width: 20px; height: 20px; border-radius: 50%; background: var(--panel-soft); color: var(--muted); font-size: 11px; display: grid; place-items: center; font-weight: 600; }
+    .export-card .hint { color: var(--faint); }
+    .export-formats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+    .export-foot { display: flex; align-items: center; gap: 12px; margin-top: 22px; flex-wrap: wrap; }
+    .export-foot .spacer { flex: 1; }
+    .export-progress { font-size: 12.5px; color: var(--muted); }
+    .export-error { color: var(--red); font-size: 13px; }
+    .skeleton-line { height: 12px; margin-bottom: 8px; border-radius: 6px; }
+    .export-formats { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+    .format-option { align-items: flex-start; }
+    .format-option input { margin-top: 3px; accent-color: var(--accent); }
+    .format-option .radio-text { display: grid; gap: 3px; }
+    .format-option .radio-text strong { font-size: 13.5px; font-weight: 650; }
+    .format-option .radio-text span { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+    .format-option.disabled { opacity: .45; pointer-events: none; }
+    .column-item, .entry-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 5px 6px; border-radius: 6px; cursor: pointer; }
+    .column-item:hover, .entry-item:hover { background: var(--panel-soft); }
+    .column-item input, .entry-item input { accent-color: var(--accent); }
+    .column-item .column-name { font-weight: 550; }
+    .column-item .column-type { color: var(--faint); font-size: 11px; margin-left: 2px; }
+    .column-item.locked { opacity: .7; cursor: default; }
+    .entry-item .entry-note { color: var(--faint); font-size: 11.5px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    @media (max-width: 640px) { .export-page { padding: 24px 16px 56px; } .export-page h1 { font-size: 24px; } .format-options, .export-formats { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="export-page">
+    <div class="export-top">
+      <a class="export-brand" href="/"><span class="mark">◈</span> Internet Tracker</a>
+      <a class="btn ghost sm" href="/">返回工作台</a>
+    </div>
+
+    <h1>导出中心</h1>
+    <p class="lede">把任意数据表导出为 Excel（xlsx）或 CSV。可以选择“最新一次抓取”“全部历史快照”或两者各一张工作表，并自定义列与行。</p>
+
+    <div id="export-app">
+      <div class="export-card"><div class="skeleton skeleton-line" style="width:40%"></div></div>
+    </div>
+  </div>
+  <div id="toast-root" class="toast-root"></div>
+  <script type="module" src="/js/export.js"></script>
+</body>
+</html>
