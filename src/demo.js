@@ -158,7 +158,7 @@ function productSvg(asin) {
   return `/demo/asset/cover.svg?asin=${encodeURIComponent(asin)}`;
 }
 
-export function registerDemoRoutes(router, { port }) {
+export function registerDemoRoutes(router) {
   router.get('/demo/asset/cover.svg', async ({ res, query }) => {
     let asin = String(query.asin || 'B0DEMO001').trim();
     if (!/^[A-Za-z0-9_-]{1,24}$/.test(asin)) asin = 'B0DEMO001';
@@ -170,7 +170,6 @@ export function registerDemoRoutes(router, { port }) {
   });
 
   router.get('/demo', async ({ res }) => {
-    const url = `http://127.0.0.1:${port}`;
     const html = `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>示例商店 · Internet Tracker</title><style>${COMMON_CSS}
@@ -188,7 +187,7 @@ export function registerDemoRoutes(router, { port }) {
 </style></head>
 <body>
 <header class="topbar"><div class="brand"><span class="mark">◆</span> 示例商店 <span class="tag">DEMO</span></div>
-<nav class="topnav"><a href="/demo">首页</a><a href="/demo/market?asin=B0DEMO001">商品</a><a href="${url}/#/settings">设置</a></nav>
+<nav class="topnav"><a href="/demo">首页</a><a href="/demo/market?asin=B0DEMO001">商品</a><a href="/#/settings">设置</a></nav>
 <div class="spacer"></div><div class="cart">🛒 3</div></header>
 <div class="hero">
   <h1>一个安静的、会变动的商品页，<br>用来验证你的抓取模板。</h1>
@@ -204,8 +203,8 @@ ${[1, 2, 3]
   )
   .join('')}
 </div>
-<div class="cards"><p class="hint">打开 <a href="${url}/#/">Internet Tracker</a> 中的「示例 · 商品价格追踪」数据表，点击刷新即可看到抓取结果。</p></div>
-<footer>示例商店仅用于本地演示，不会发起任何网络请求。</footer>
+<div class="cards"><p class="hint">打开 <a href="/#/">Internet Tracker</a> 中的「示例 · 商品价格追踪」数据表，点击刷新即可看到抓取结果。</p></div>
+<footer>示例商店仅用于本机/局域网演示，不会发起任何网络请求。</footer>
 </body></html>`;
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(html);

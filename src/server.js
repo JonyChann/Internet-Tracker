@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { VERSION, loadConfig, saveConfig, dbDescriptor, publicConfig } from './config.js';
+import { VERSION, loadConfig, saveConfig, dbDescriptor, publicConfig, networkInfo } from './config.js';
 import { EventHub, Router, createHttpServer, sendJson } from './http.js';
 import { initDatabase, closeDatabase, currentDbInfo } from './db/index.js';
 import { seedDemo } from './db/seed.js';
@@ -85,7 +85,21 @@ async function main() {
   });
 
   scheduler.start();
-  log(`Internet Tracker v${VERSION} 已启动：http://${config.host}:${config.port}`);
+  const network = networkInfo(config);
+  log(`Internet Tracker v${VERSION} 已启动：${network.localUrl}`);
+  if (network.lanVisible) {
+    if (network.lanUrls.length) {
+      for (const url of network.lanUrls) log(`局域网访问：${url}`);
+      log('注意：局域网内任何设备都能访问本工具（没有登录鉴权），请只在可信网络使用。');
+    } else {
+      log('监听地址为 0.0.0.0，但没有检测到局域网 IPv4 地址（请检查 Wi-Fi / 网线）。');
+    }
+  } else {
+    log('当前仅本机可访问。如需局域网访问，把配置中的 host 改为 0.0.0.0 后重启。');
+  }
+  if (process.platform === 'darwin' && network.lanVisible) {
+    log('如果其他设备无法连接，请在「系统设置 → 网络 → 防火墙」中允许 node 接受传入连接。');
+  }
   log(`Chrome 抓取器：${browser.status().path || '未找到 Chrome'}`);
   log('按 Ctrl+C 停止');
 

@@ -104,6 +104,20 @@ test('health exposes the sqlite database and version', async () => {
   assert.ok(data.version);
 });
 
+test('settings expose network info and reject invalid listen hosts', async () => {
+  const { res, data } = await api('/api/settings');
+  assert.equal(res.status, 200);
+  assert.ok(data.network);
+  assert.equal(data.network.localUrl, base);
+  assert.equal(data.network.host, '127.0.0.1');
+  assert.equal(data.network.lanVisible, false);
+  assert.deepEqual(data.network.lanUrls, []);
+
+  const invalid = await api('/api/settings', { method: 'PUT', body: { host: '1.2.3.4' } });
+  assert.equal(invalid.res.status, 400);
+  assert.match(invalid.data.error, /监听地址/);
+});
+
 test('a table can be created with variables and fields', async () => {
   let result = await api('/api/tables', {
     method: 'POST',
@@ -187,6 +201,16 @@ test('settings can test a sqlite connection', async () => {
   assert.equal(res.status, 200);
   assert.equal(data.ok, true);
   assert.ok(fs.existsSync(probe));
+});
+
+test('cross-origin writes are rejected', async () => {
+  const res = await fetch(`${base}/api/tables`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: 'https://evil.example' },
+    body: JSON.stringify({ name: 'csrf' }),
+  });
+  assert.equal(res.status, 403);
+  assert.match((await res.json()).error, /跨站/);
 });
 
 test('SSE stream stays open and sends the hello event', async () => {

@@ -258,6 +258,25 @@ export function createHttpServer({ router, publicDir, events, log = true }) {
       return;
     }
 
+    // The server may be reachable from the LAN, so reject browser writes that
+    // come from another origin. Non-browser clients (curl, scripts) send no
+    // Origin header and are unaffected.
+    if (url.pathname.startsWith('/api/') && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+      const origin = req.headers.origin;
+      if (origin) {
+        let originHost = null;
+        try {
+          originHost = new URL(origin).host;
+        } catch {
+          originHost = null;
+        }
+        if (!originHost || originHost !== req.headers.host) {
+          sendJson(res, 403, { error: '已拒绝跨站请求' });
+          return;
+        }
+      }
+    }
+
     const route = router.match(req.method, url.pathname);
     if (route) {
       try {

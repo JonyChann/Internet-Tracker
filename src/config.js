@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -18,7 +19,7 @@ export function resolvePath(p) {
 function defaults() {
   const config = {
     port: Number(process.env.PORT || 4780),
-    host: process.env.HOST || '127.0.0.1',
+    host: process.env.HOST || '0.0.0.0',
     db: {
       driver: 'sqlite',
       file: process.env.IT_DB_FILE || path.join('data', 'tracker.db'),
@@ -44,6 +45,35 @@ function defaults() {
     config.db = { driver: driverFromUrl(process.env.IT_DB_URL), url: process.env.IT_DB_URL };
   }
   return config;
+}
+
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', 'localhost']);
+// Skip loopback and virtual adapters (bridges, VPN tunnels, container networks)
+// so the addresses we advertise are the ones other devices can actually reach.
+const VIRTUAL_IFACE = /^(lo|bridge|utun|awdl|llw|vmnet|vboxnet|docker|veth|br-|tun|tap|zt|tailscale|wg)/i;
+
+/** Human readable bind mode plus the URLs other devices can use. */
+export function networkInfo(config = {}) {
+  const host = config.host || '0.0.0.0';
+  const port = Number(config.port) || 4780;
+  const lanVisible = host === '0.0.0.0' || host === '::';
+  const interfaces = [];
+  for (const [name, list] of Object.entries(os.networkInterfaces())) {
+    if (VIRTUAL_IFACE.test(name)) continue;
+    for (const item of list || []) {
+      if (item.family !== 'IPv4' || item.internal) continue;
+      interfaces.push({ name, address: item.address, url: `http://${item.address}:${port}` });
+    }
+  }
+  return {
+    host,
+    port,
+    lanVisible,
+    bindLabel: lanVisible ? '所有网络接口（局域网可访问）' : LOOPBACK_HOSTS.has(host) ? '仅本机' : host,
+    localUrl: `http://127.0.0.1:${port}`,
+    lanUrls: lanVisible ? [...new Set(interfaces.map((item) => item.url))] : [],
+    interfaces,
+  };
 }
 
 export function driverFromUrl(url = '') {

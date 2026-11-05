@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { HttpError, sendJson } from '../http.js';
 import * as store from '../db/store.js';
-import { describeDb, dbDescriptor, publicConfig, resolvePath, VERSION, DATA_DIR, CONFIG_PATH } from '../config.js';
+import { describeDb, dbDescriptor, publicConfig, resolvePath, networkInfo, VERSION, DATA_DIR, CONFIG_PATH } from '../config.js';
 import { initDatabase, testDatabase } from '../db/index.js';
 import { clampInt, optionalString, requireObject } from './helpers.js';
 
@@ -49,6 +49,7 @@ export function registerSettingsRoutes(router, ctx) {
       chrome: browser.status(),
       db: describeDb(dbDescriptor(config.db)),
       stats: await store.getStats(),
+      network: networkInfo(config),
       paths: { dataDir: DATA_DIR, config: CONFIG_PATH, database: dbDescriptor(config.db).file || '' },
     });
   });
@@ -57,6 +58,16 @@ export function registerSettingsRoutes(router, ctx) {
     const config = getConfig();
     const payload = requireObject(body);
     let restartBrowser = false;
+    let restartServer = false;
+
+    if (payload.host !== undefined) {
+      const host = String(payload.host).trim();
+      if (!['0.0.0.0', '127.0.0.1', '::', '::1', 'localhost'].includes(host)) {
+        throw new HttpError(400, '监听地址只支持 0.0.0.0（所有网络接口）或 127.0.0.1（仅本机）');
+      }
+      if (host !== config.host) restartServer = true;
+      config.host = host;
+    }
 
     if (payload.scraper !== undefined) {
       const scraper = requireObject(payload.scraper, '浏览器设置');
@@ -99,7 +110,13 @@ export function registerSettingsRoutes(router, ctx) {
 
     saveConfig(config);
     if (restartBrowser) await browser.close();
-    sendJson(res, 200, { ok: true, config: publicConfig(config), chrome: browser.status() });
+    sendJson(res, 200, {
+      ok: true,
+      config: publicConfig(config),
+      chrome: browser.status(),
+      network: networkInfo(config),
+      restartRequired: restartServer,
+    });
   });
 
   router.get('/api/settings/chrome', async ({ res }) => {

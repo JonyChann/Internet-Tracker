@@ -1,5 +1,5 @@
 import { api, apiGet, apiPost, apiPut } from './api.js';
-import { escapeHtml, icons, loadingBlock, toast, confirmDialog } from './ui.js';
+import { escapeHtml, icons, loadingBlock, toast, confirmDialog, copyText } from './ui.js';
 
 const DRIVERS = [
   ['sqlite', 'SQLite（内置，无需安装）'],
@@ -23,12 +23,13 @@ export async function renderSettingsView(container, { state, reloadInfo }) {
   const scraper = config.scraper;
   const db = settings.db;
   const isSqlite = db.driver === 'sqlite';
+  const network = settings.network || { host: config.host, port: config.port, lanVisible: false, localUrl: `http://127.0.0.1:${config.port}`, lanUrls: [] };
 
   container.innerHTML = `
   <div class="settings-page">
     <div class="breadcrumb"><a href="#/">← 返回数据表</a></div>
     <h2>设置</h2>
-    <p class="lead">数据库、Chrome 抓取器与自动刷新策略。修改会写入 <code style="font-size:11.5px">data/config.json</code>。</p>
+    <p class="lead">数据库、Chrome 抓取器、网络访问与自动刷新策略。修改会写入 <code style="font-size:11.5px">data/config.json</code>。</p>
 
     <section class="settings-section">
       <div class="section-head">
@@ -100,6 +101,46 @@ export async function renderSettingsView(container, { state, reloadInfo }) {
     </section>
 
     <section class="settings-section">
+      <div class="section-head">
+        <h3>网络访问</h3>
+        <span class="sh-sub"><span class="badge ${network.lanVisible ? 'on' : 'off'}">${network.lanVisible ? '局域网可访问' : '仅本机'}</span></span>
+      </div>
+      <div class="section-body">
+        <div class="form-grid two">
+          <div class="field"><label>监听地址</label>
+            <select id="net-host">
+              <option value="0.0.0.0" ${network.host === '0.0.0.0' ? 'selected' : ''}>0.0.0.0 — 局域网内可访问</option>
+              <option value="127.0.0.1" ${network.host === '127.0.0.1' ? 'selected' : ''}>127.0.0.1 — 仅本机</option>
+            </select>
+            <div class="hint">修改后需要重启程序（Ctrl+C 后重新 npm start）。</div>
+          </div>
+          <div class="field"><label>端口</label>
+            <input type="text" value="${escapeHtml(String(network.port))}" disabled>
+            <div class="hint">要改端口，请编辑 data/config.json 的 port，或启动时设置 PORT。</div>
+          </div>
+        </div>
+        <div class="preview-box">
+          <div class="pv-row"><span class="pv-label">本机地址</span><span class="pv-value mono"><a href="${escapeHtml(network.localUrl)}" target="_blank" rel="noopener">${escapeHtml(network.localUrl)}</a></span></div>
+          ${
+            network.lanUrls && network.lanUrls.length
+              ? network.lanUrls
+                  .map(
+                    (url) =>
+                      `<div class="pv-row"><span class="pv-label">局域网地址</span><span class="pv-value mono"><a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a> <button class="link-btn" data-copy="${escapeHtml(url)}">复制</button></span></div>`,
+                  )
+                  .join('')
+              : `<div class="pv-row"><span class="pv-label">局域网地址</span><span class="pv-value">${network.lanVisible ? '未检测到局域网 IPv4 地址，请检查 Wi-Fi / 网线' : '切换到 0.0.0.0 并重启后，这里会显示可访问地址'}</span></div>`
+          }
+        </div>
+        <div class="form-row">
+          <button class="btn primary" id="net-save">保存监听设置</button>
+          <span class="hint" style="align-self:center">其他设备需要与本机处于同一局域网。</span>
+        </div>
+        <div class="hint" style="margin-top:10px">⚠️ 本工具没有登录鉴权，同网段任何设备都能打开并操作它。请只在可信网络中使用，不要把端口转发到公网。</div>
+      </div>
+    </section>
+
+    <section class="settings-section">
       <div class="section-head"><h3>自动刷新</h3></div>
       <div class="section-body">
         <label class="checkbox"><input type="checkbox" id="sch-enabled" ${config.scheduler.enabled ? 'checked' : ''}>
@@ -113,7 +154,8 @@ export async function renderSettingsView(container, { state, reloadInfo }) {
       <div class="section-head"><h3>关于</h3><span class="sh-sub">v${escapeHtml(settings.version)}</span></div>
       <div class="section-body">
         <dl class="kv-list">
-          <dt>运行地址</dt><dd>http://${escapeHtml(config.host)}:${escapeHtml(String(config.port))}</dd>
+          <dt>本机地址</dt><dd>${escapeHtml(network.localUrl)}</dd>
+          ${network.lanUrls && network.lanUrls.length ? `<dt>局域网地址</dt><dd>${network.lanUrls.map((url) => escapeHtml(url)).join('<br>')}</dd>` : '<dt>局域网地址</dt><dd>仅本机（未开放）</dd>'}
           <dt>Node 版本</dt><dd>${escapeHtml(settings.node)}</dd>
           <dt>数据目录</dt><dd>${escapeHtml(settings.paths.dataDir)}</dd>
           <dt>配置文件</dt><dd>${escapeHtml(settings.paths.config)}</dd>
@@ -243,6 +285,29 @@ export async function renderSettingsView(container, { state, reloadInfo }) {
     } catch (err) {
       toast(err.message, 'error');
     }
+  });
+
+  /* ---------- 网络 ---------- */
+  container.querySelector('#net-save').addEventListener('click', async () => {
+    const host = container.querySelector('#net-host').value;
+    try {
+      const result = await apiPut('/api/settings', { host });
+      toast(result.restartRequired ? '已保存，重启程序后生效' : '监听设置未变化', 'ok', 5000);
+      await renderSettingsView(container, { state, reloadInfo });
+    } catch (err) {
+      toast(err.message, 'error', 6000);
+    }
+  });
+
+  container.querySelectorAll('[data-copy]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      try {
+        await copyText(btn.dataset.copy);
+        toast('已复制地址', 'ok', 1800);
+      } catch {
+        toast('复制失败，请手动选择地址', 'error');
+      }
+    });
   });
 
   /* ---------- 调度器 ---------- */

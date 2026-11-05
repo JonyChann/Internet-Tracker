@@ -12,7 +12,7 @@ export function registerApiRoutes(router, ctx) {
   registerExportRoutes(router, ctx);
   registerSettingsRoutes(router, ctx);
   if (ctx.demo !== false) {
-    registerDemoRoutes(router, { port: ctx.getConfig().port });
+    registerDemoRoutes(router);
   }
   return router;
 }
