@@ -2,11 +2,11 @@
  * PostgreSQL adapter. Requires the optional `pg` package:
  *   npm install pg
  */
-export async function openPostgres(url) {
+async function openPostgres(url) {
   let pg;
   try {
-    pg = (await import('pg')).default;
-  } catch {
+    pg = require('pg');
+  } catch (err) {
     throw new Error('PostgreSQL 支持需要安装可选依赖：npm install pg');
   }
 
@@ -21,10 +21,10 @@ export async function openPostgres(url) {
   };
 
   const all = async (sql, params = []) => (await pool.query(convert(sql), params)).rows;
-  const get = async (sql, params = []) => (await pool.query(convert(sql), params)).rows[0] ?? null;
+  const get = async (sql, params = []) => (await pool.query(convert(sql), params)).rows[0] || null;
   const run = async (sql, params = []) => {
     const result = await pool.query(convert(sql), params);
-    return { changes: result.rowCount ?? 0 };
+    return { changes: result.rowCount || 0 };
   };
 
   return {
@@ -41,3 +41,7 @@ export async function openPostgres(url) {
     },
   };
 }
+
+module.exports = {
+  openPostgres,
+};

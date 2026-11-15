@@ -1,7 +1,6 @@
-import * as store from '../db/store.js';
-import { HttpError, sendJson } from '../http.js';
-import { clampInt, optionalString, requireObject } from './helpers.js';
-
+const store = require('../db/store');
+const { HttpError, sendJson } = require('../http');
+const { clampInt, optionalString, requireObject } = require('./helpers');
 function normalizeVars(table, input = {}) {
   if (input !== null && (typeof input !== 'object' || Array.isArray(input))) {
     throw new HttpError(400, '变量值格式不正确');
@@ -9,8 +8,8 @@ function normalizeVars(table, input = {}) {
   const vars = {};
   const tableVars = Array.isArray(table.variables) ? table.variables : [];
   for (const variable of tableVars) {
-    const raw = input?.[variable.key];
-    const value = raw === undefined || raw === null ? variable.default ?? '' : raw;
+    const raw = input ? input[variable.key] : undefined;
+    const value = raw === undefined || raw === null ? (variable.default === undefined || variable.default === null ? '' : variable.default) : raw;
     const text = String(value).trim();
     if (!text && variable.required !== false) {
       throw new HttpError(400, `缺少变量「${variable.label || variable.key}」`);
@@ -26,7 +25,7 @@ function normalizeVars(table, input = {}) {
   return vars;
 }
 
-export function registerEntryRoutes(router, ctx) {
+function registerEntryRoutes(router, ctx) {
   router.get('/api/tables/:id/entries', async ({ res, params }) => {
     const table = await store.getDataset(params.id);
     if (!table) throw new HttpError(404, '数据表不存在');
@@ -144,3 +143,7 @@ export function registerEntryRoutes(router, ctx) {
     sendJson(res, 200, { runs: await store.listRuns({ datasetId: params.id, limit }) });
   });
 }
+
+module.exports = {
+  registerEntryRoutes,
+};

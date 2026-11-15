@@ -1,4 +1,4 @@
-export const STATUS_LABELS = {
+const STATUS_LABELS = {
   ok: '成功',
   partial: '部分成功',
   error: '失败',
@@ -6,11 +6,11 @@ export const STATUS_LABELS = {
   idle: '未抓取',
 };
 
-export function statusLabel(status) {
+function statusLabel(status) {
   return STATUS_LABELS[status] || status || '未知';
 }
 
-export function valueFor(value) {
+function valueFor(value) {
   if (value === null || value === undefined) return '';
   if (Array.isArray(value)) return value.map((item) => valueFor(item)).join(' | ');
   if (typeof value === 'object') return JSON.stringify(value);
@@ -19,12 +19,12 @@ export function valueFor(value) {
 
 function variableValues(dataset, entry) {
   return (dataset.variables || []).map((variable) => {
-    const value = entry.vars?.[variable.key];
+    const value = (entry.vars ? entry.vars[variable.key] : undefined);
     return value === undefined || value === null ? '' : valueFor(value);
   });
 }
 
-export function buildSheet({ dataset, fields, entries, snapshots, mode = 'latest', columns }) {
+function buildSheet({ dataset, fields, entries, snapshots, mode = 'latest', columns }) {
   const selected = Array.isArray(columns) && columns.length ? fields.filter((field) => columns.includes(field.id)) : fields;
   const headers = [
     ...(dataset.variables || []).map((variable) => variable.label || variable.key),
@@ -42,7 +42,7 @@ export function buildSheet({ dataset, fields, entries, snapshots, mode = 'latest
       if (!entry) continue;
       rows.push([
         ...variableValues(dataset, entry),
-        ...selected.map((field) => valueFor(snapshot.values?.[field.id])),
+        ...selected.map((field) => valueFor((snapshot.values ? snapshot.values[field.id] : undefined))),
         statusLabel(snapshot.status),
         snapshot.capturedAt,
         entry.note || '',
@@ -52,7 +52,7 @@ export function buildSheet({ dataset, fields, entries, snapshots, mode = 'latest
     for (const entry of entries) {
       rows.push([
         ...variableValues(dataset, entry),
-        ...selected.map((field) => valueFor(entry.latestValues?.[field.id])),
+        ...selected.map((field) => valueFor((entry.latestValues ? entry.latestValues[field.id] : undefined))),
         statusLabel(entry.latestStatus),
         entry.lastRunAt || '',
         entry.note || '',
@@ -63,7 +63,7 @@ export function buildSheet({ dataset, fields, entries, snapshots, mode = 'latest
   return { name: mode === 'history' ? '历史记录' : '最新数据', headers, rows };
 }
 
-export function buildSheets({ dataset, fields, entries, snapshots, mode = 'latest', columns }) {
+function buildSheets({ dataset, fields, entries, snapshots, mode = 'latest', columns }) {
   if (mode === 'history') {
     return [buildSheet({ dataset, fields, entries, snapshots, mode: 'history', columns })];
   }
@@ -76,7 +76,7 @@ export function buildSheets({ dataset, fields, entries, snapshots, mode = 'lates
   return [buildSheet({ dataset, fields, entries, snapshots, mode: 'latest', columns })];
 }
 
-export function exportFileName(dataset, mode, extension) {
+function exportFileName(dataset, mode, extension) {
   const now = new Date();
   const pad = (value) => String(value).padStart(2, '0');
   const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}`;
@@ -86,3 +86,12 @@ export function exportFileName(dataset, mode, extension) {
     .slice(0, 60);
   return `${base}_${modeLabel}_${stamp}.${extension}`;
 }
+
+module.exports = {
+  statusLabel,
+  valueFor,
+  buildSheet,
+  buildSheets,
+  exportFileName,
+  STATUS_LABELS,
+};

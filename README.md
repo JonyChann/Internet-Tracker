@@ -2,16 +2,18 @@
 
 一个用 Node.js 写的互联网数据跟踪工具。界面类似 Notion 表格：**每一列是一个抓取模板，每一行只需要填变量**，后台用 Chrome 打开页面、按模板提取数据，并保存每一次刷新得到的历史快照。
 
+> **当前分支：`v10`** — 兼容 Node.js 10 LTS 的版本（CommonJS + `sql.js` + `puppeteer-core` 5.5）。`main` 分支是 Node.js 22+ 的版本（ESM + `node:sqlite` + `puppeteer-core` 24），功能一致，按运行环境选择。
+
 - 前端：原生 ES Modules + 手写 CSS，无构建步骤
 - 抓取：`puppeteer-core` 驱动本机 Chrome（支持 CSS 选择器、XPath、JS、正则清洗）
-- 存储：默认内置 SQLite（`node:sqlite`，零编译），可切换 PostgreSQL / MySQL
+- 存储：默认内置 SQLite（`sql.js` WebAssembly，零编译），可切换 PostgreSQL / MySQL
 - 异步：抓取任务在后台队列执行，前端通过 SSE 实时收到进度
 - 导出：独立导出页，支持 XLSX（多工作表）/ CSV
 - 局域网：默认监听 `0.0.0.0`，同网段设备可直接打开使用
 
 ## 快速开始
 
-要求：**Node.js ≥ 22.13**、本机安装 **Google Chrome / Chromium / Edge**。
+要求：**Node.js ≥ 10.18.1**（已在 10.24.1 上验证）、本机安装 **Google Chrome / Chromium / Edge**。
 
 ```bash
 cd Internet-Tracker
@@ -21,7 +23,7 @@ npm start
 
 打开 <http://127.0.0.1:4780>。同一局域网内的手机/电脑可以用 `http://<本机局域网IP>:4780` 访问（启动日志和「设置 → 网络访问」里会直接给出地址）。首次启动会自动创建示例数据表「示例 · 商品价格追踪」，它抓取的是内置演示商店 `/demo`（价格每 12 秒变化一次），可以直接点「刷新全部」看效果。
 
-> 内置 SQLite 需要 Node 的 `--experimental-sqlite` 标志。`npm start` / `npm run dev` 已经带上了；如果直接 `node src/server.js` 会提示你改用 `npm start`。
+> 数据库引擎使用 `sql.js`（WebAssembly），不需要本地编译，也不依赖 `--experimental-sqlite` 标志；`npm start` 直接启动即可。数据库文件仍是标准的 SQLite 格式，可以直接用其他 SQLite 工具打开。
 
 ## 五分钟上手
 
@@ -105,7 +107,9 @@ HOST=0.0.0.0 PORT=4780 npm start
 
 ## 数据库
 
-默认使用内置 SQLite，数据文件 `data/tracker.db`（WAL 模式）。
+默认使用内置 SQLite（sql.js），数据文件 `data/tracker.db`。sql.js 会把数据库读入内存，并在每次写操作后整体写回文件，适合个人/小团队规模的数据量。
+
+> 从 `main` 分支（`node:sqlite`，WAL 模式）切换过来时，请先正常停止 main 版服务，或执行 `sqlite3 data/tracker.db 'PRAGMA wal_checkpoint(TRUNCATE);'`，把 WAL 中的数据合并进主文件，避免 v10 读不到最近的写入。
 
 在「设置 → 数据库」里可以：
 
@@ -177,7 +181,7 @@ Internet-Tracker/
 npm test
 ```
 
-包含：CSV/XLSX 生成与解包校验、变量插值/数字解析/模板规范化、数据访问层、以及一个真实启动 HTTP 服务的接口测试（会用临时目录和临时数据库，不碰你的 `data/`）。
+使用轻量测试运行器（兼容 Node 10，不依赖 `node:test`）。包含：CSV/XLSX 生成与解包校验、变量插值/数字解析/模板规范化、数据访问层、以及一个真实启动 HTTP 服务的接口测试（会用临时目录和临时数据库，不碰你的 `data/`）。
 
 ## 主要 API
 
@@ -210,8 +214,8 @@ npm test
 **端口被占用**
 `PORT=4800 npm start` 换一个端口。
 
-**Node 报 `node:sqlite` 不可用**
-Node 版本过低，或没有带 `--experimental-sqlite`。用 `npm start`，并确保 Node ≥ 22.13。
+**Node 版本不支持 / 启动报语法错误**
+v10 分支需要 Node ≥ 10.18.1（推荐 10.24.1）。如果使用 Node 22 等新版本，请改用 `main` 分支的版本。
 
 ## 限制
 

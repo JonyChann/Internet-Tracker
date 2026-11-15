@@ -158,7 +158,7 @@ function productSvg(asin) {
   return `/demo/asset/cover.svg?asin=${encodeURIComponent(asin)}`;
 }
 
-export function registerDemoRoutes(router) {
+function registerDemoRoutes(router) {
   router.get('/demo/asset/cover.svg', async ({ res, query }) => {
     let asin = String(query.asin || 'B0DEMO001').trim();
     if (!/^[A-Za-z0-9_-]{1,24}$/.test(asin)) asin = 'B0DEMO001';
@@ -283,3 +283,7 @@ ${[1, 2, 3]
     res.end(html);
   });
 }
+
+module.exports = {
+  registerDemoRoutes,
+};

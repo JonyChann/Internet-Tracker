@@ -1,8 +1,7 @@
-import * as store from '../db/store.js';
-import { HttpError, sendJson } from '../http.js';
-import { normalizeDataType, normalizeTemplate } from '../scraper/extract.js';
-import { requireObject, requireString } from './helpers.js';
-
+const store = require('../db/store');
+const { HttpError, sendJson } = require('../http');
+const { normalizeDataType, normalizeTemplate } = require('../scraper/extract');
+const { requireObject, requireString } = require('./helpers');
 function normalizeFieldPayload(payload, creating) {
   const patch = {};
   if (creating || payload.name !== undefined) {
@@ -31,7 +30,7 @@ function normalizeFieldPayload(payload, creating) {
   return patch;
 }
 
-export function registerFieldRoutes(router) {
+function registerFieldRoutes(router) {
   router.get('/api/tables/:id/fields', async ({ res, params }) => {
     const table = await store.getDataset(params.id);
     if (!table) throw new HttpError(404, '数据表不存在');
@@ -72,3 +71,7 @@ export function registerFieldRoutes(router) {
     sendJson(res, 200, { fields });
   });
 }
+
+module.exports = {
+  registerFieldRoutes,
+};

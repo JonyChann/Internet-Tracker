@@ -1,34 +1,76 @@
-import fs from 'node:fs';
-import path from 'node:path';
+const fs = require('fs');
+const path = require('path');
 
 /**
- * SQLite adapter built on Node's bundled `node:sqlite` module (Node 22.13+,
- * requires the --experimental-sqlite flag, which `npm start` adds).
+ * SQLite adapter for Node 10 based on sql.js (WebAssembly).
+ *
+ * Node 10 has no `node:sqlite` and native SQLite bindings need a compiler on
+ * every platform, so this adapter keeps the database in memory and writes the
+ * exported SQLite file back to disk after each mutation. The file format stays
+ * a normal `.db`, so it can be opened by sqlite3 or moved to a newer Node.
  */
-export async function openSqlite(file) {
-  let DatabaseSync;
-  try {
-    ({ DatabaseSync } = await import('node:sqlite'));
-  } catch {
+async function openSqlite(file) {
+  // sql.js can only read the main database file; unmerged WAL contents would be
+  // silently lost. Refuse to start instead of overwriting them.
+  const walPath = `${file}-wal`;
+  if (fs.existsSync(file) && fs.existsSync(walPath) && fs.statSync(walPath).size > 0) {
     throw new Error(
-      '当前 Node.js 无法加载 node:sqlite。请使用 `npm start` 启动（Node 22.13+ 并带 --experimental-sqlite），或在设置中切换到 PostgreSQL / MySQL。',
+      `检测到未合并的 WAL 文件：${walPath}\n` +
+        '请先停止 main 分支的服务，或执行以下命令合并后再启动 v10：\n' +
+        `  sqlite3 "${file}" "PRAGMA wal_checkpoint(TRUNCATE);"`,
     );
+  }
+  let initSqlJs;
+  try {
+    initSqlJs = require('sql.js');
+  } catch (err) {
+    throw new Error('SQLite 支持需要安装依赖：npm install sql.js');
   }
 
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  const raw = new DatabaseSync(file);
-  raw.exec('PRAGMA journal_mode = WAL');
-  raw.exec('PRAGMA foreign_keys = ON');
-  raw.exec('PRAGMA busy_timeout = 5000');
+  const SQL = await initSqlJs({
+    locateFile: (name) => require.resolve(`sql.js/dist/${name}`),
+  });
 
-  const all = async (sql, params = []) => raw.prepare(sql).all(...params).map((row) => ({ ...row }));
-  const get = async (sql, params = []) => {
-    const row = raw.prepare(sql).get(...params);
-    return row ? { ...row } : null;
+  let data;
+  if (fs.existsSync(file) && fs.statSync(file).size > 0) {
+    data = new Uint8Array(fs.readFileSync(file));
+  }
+  const raw = new SQL.Database(data);
+  raw.run('PRAGMA foreign_keys = ON');
+
+  const persist = () => {
+    // sql.js export() closes and reopens the connection internally, so
+    // connection-scoped PRAGMAs must be reapplied afterwards.
+    const bytes = Buffer.from(raw.export());
+    raw.run('PRAGMA foreign_keys = ON');
+    const tmp = `${file}.tmp`;
+    fs.writeFileSync(tmp, bytes);
+    fs.renameSync(tmp, file);
   };
+
+  const all = async (sql, params = []) => {
+    const stmt = raw.prepare(sql);
+    try {
+      stmt.bind(params);
+      const rows = [];
+      while (stmt.step()) rows.push(stmt.getAsObject());
+      return rows;
+    } finally {
+      stmt.free();
+    }
+  };
+
+  const get = async (sql, params = []) => {
+    const rows = await all(sql, params);
+    return rows.length ? rows[0] : null;
+  };
+
   const run = async (sql, params = []) => {
-    const result = raw.prepare(sql).run(...params);
-    return { changes: Number(result.changes ?? 0) };
+    raw.run(sql, params);
+    const changes = raw.getRowsModified();
+    persist();
+    return { changes: Number(changes || 0) };
   };
 
   return {
@@ -39,9 +81,13 @@ export async function openSqlite(file) {
     run,
     exec: async (sql) => {
       raw.exec(sql);
+      persist();
     },
     async close() {
+      persist();
       raw.close();
     },
   };
 }
+
+module.exports = { openSqlite };

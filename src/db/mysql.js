@@ -2,11 +2,11 @@
  * MySQL / MariaDB adapter. Requires the optional `mysql2` package:
  *   npm install mysql2
  */
-export async function openMysql(url) {
+async function openMysql(url) {
   let mysql;
   try {
-    mysql = await import('mysql2/promise');
-  } catch {
+    mysql = require('mysql2/promise');
+  } catch (err) {
     throw new Error('MySQL 支持需要安装可选依赖：npm install mysql2');
   }
 
@@ -29,7 +29,7 @@ export async function openMysql(url) {
   };
   const run = async (sql, params = []) => {
     const [result] = await pool.query(sql, params);
-    return { changes: result?.affectedRows ?? 0 };
+    return { changes: (result && result.affectedRows) || 0 };
   };
 
   return {
@@ -46,3 +46,7 @@ export async function openMysql(url) {
     },
   };
 }
+
+module.exports = {
+  openMysql,
+};

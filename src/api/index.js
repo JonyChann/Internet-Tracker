@@ -1,11 +1,10 @@
-import { registerDemoRoutes } from '../demo.js';
-import { registerEntryRoutes } from './entries.js';
-import { registerExportRoutes } from './export.js';
-import { registerFieldRoutes } from './fields.js';
-import { registerSettingsRoutes } from './settings.js';
-import { registerTableRoutes } from './tables.js';
-
-export function registerApiRoutes(router, ctx) {
+const { registerDemoRoutes } = require('../demo');
+const { registerEntryRoutes } = require('./entries');
+const { registerExportRoutes } = require('./export');
+const { registerFieldRoutes } = require('./fields');
+const { registerSettingsRoutes } = require('./settings');
+const { registerTableRoutes } = require('./tables');
+function registerApiRoutes(router, ctx) {
   registerTableRoutes(router, ctx);
   registerFieldRoutes(router, ctx);
   registerEntryRoutes(router, ctx);
@@ -16,3 +15,7 @@ export function registerApiRoutes(router, ctx) {
   }
   return router;
 }
+
+module.exports = {
+  registerApiRoutes,
+};

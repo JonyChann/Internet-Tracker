@@ -1,5 +1,5 @@
-import zlib from 'node:zlib';
-
+const zlib = require('zlib');
+const { coalesce } = require('../util');
 /* Minimal XLSX (SpreadsheetML) writer with no third-party dependencies.
  * Produces a valid .xlsx (zip + workbook.xml + worksheet parts + styles). */
 
@@ -166,14 +166,14 @@ function sanitizeSheetName(name, used) {
   return candidate;
 }
 
-export function buildXlsx(rawSheets) {
+function buildXlsx(rawSheets) {
   if (!Array.isArray(rawSheets) || !rawSheets.length) throw new Error('导出内容为空');
   const used = new Set();
   const sheets = rawSheets.map((sheet) => {
     const rows = Array.isArray(sheet.rows) ? sheet.rows : [];
     const headers = Array.isArray(sheet.headers) ? sheet.headers : [];
     const widths = headers.map((header, index) => {
-      const lengths = [String(header ?? '').length, ...rows.slice(0, 500).map((row) => String(row[index] ?? '').length)];
+      const lengths = [String(coalesce(header, '')).length, ...rows.slice(0, 500).map((row) => String(coalesce(row[index], '')).length)];
       return Math.min(60, Math.max(10, Math.round(Math.max(...lengths) * 1.3) + 2));
     });
     return { name: sanitizeSheetName(sheet.name, used), headers, rows, widths };
@@ -260,3 +260,7 @@ ${sheets
     ...sheetFiles,
   ]);
 }
+
+module.exports = {
+  buildXlsx,
+};

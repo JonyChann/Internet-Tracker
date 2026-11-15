@@ -1,17 +1,15 @@
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const ROOT = path.resolve(__dirname, '..');
+const PUBLIC_DIR = path.join(ROOT, 'public');
+const DATA_DIR = path.resolve(process.env.IT_DATA_DIR || path.join(ROOT, 'data'));
+const CONFIG_PATH = path.join(DATA_DIR, 'config.json');
 
-export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const PUBLIC_DIR = path.join(ROOT, 'public');
-export const DATA_DIR = path.resolve(process.env.IT_DATA_DIR || path.join(ROOT, 'data'));
-export const CONFIG_PATH = path.join(DATA_DIR, 'config.json');
-
-export const VERSION = '0.1.0';
+const VERSION = '0.1.0';
 
 /** Resolve a user supplied path relative to the project root. */
-export function resolvePath(p) {
+function resolvePath(p) {
   if (!p) return p;
   return path.isAbsolute(p) ? p : path.resolve(ROOT, p);
 }
@@ -53,7 +51,7 @@ const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', 'localhost']);
 const VIRTUAL_IFACE = /^(lo|bridge|utun|awdl|llw|vmnet|vboxnet|docker|veth|br-|tun|tap|zt|tailscale|wg)/i;
 
 /** Human readable bind mode plus the URLs other devices can use. */
-export function networkInfo(config = {}) {
+function networkInfo(config = {}) {
   const host = config.host || '0.0.0.0';
   const port = Number(config.port) || 4780;
   const lanVisible = host === '0.0.0.0' || host === '::';
@@ -76,7 +74,7 @@ export function networkInfo(config = {}) {
   };
 }
 
-export function driverFromUrl(url = '') {
+function driverFromUrl(url = '') {
   const scheme = String(url).split(':')[0].toLowerCase();
   if (scheme === 'postgres' || scheme === 'postgresql') return 'postgres';
   if (scheme === 'mysql' || scheme === 'mariadb') return 'mysql';
@@ -110,7 +108,7 @@ function applyEnv(config) {
   return config;
 }
 
-export function loadConfig() {
+function loadConfig() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   let stored = {};
   if (fs.existsSync(CONFIG_PATH)) {
@@ -125,7 +123,7 @@ export function loadConfig() {
   return config;
 }
 
-export function saveConfig(config) {
+function saveConfig(config) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const tmp = `${CONFIG_PATH}.tmp`;
   fs.writeFileSync(tmp, `${JSON.stringify(config, null, 2)}\n`);
@@ -133,14 +131,14 @@ export function saveConfig(config) {
 }
 
 /** Turn the config's db block into a concrete descriptor for the adapters. */
-export function dbDescriptor(db = {}) {
+function dbDescriptor(db = {}) {
   if (db.url) {
     return { driver: db.driver || driverFromUrl(db.url), url: String(db.url).trim() };
   }
   return { driver: db.driver || 'sqlite', file: resolvePath(db.file || path.join('data', 'tracker.db')) };
 }
 
-export function describeDb(desc) {
+function describeDb(desc) {
   if (!desc) return null;
   if (desc.driver === 'sqlite') {
     return { driver: 'sqlite', file: desc.file, label: 'SQLite' };
@@ -149,7 +147,7 @@ export function describeDb(desc) {
 }
 
 /** Safe subset of the config handed to the browser. */
-export function publicConfig(config) {
+function publicConfig(config) {
   return {
     version: VERSION,
     host: config.host,
@@ -168,3 +166,19 @@ export function publicConfig(config) {
     dataDir: DATA_DIR,
   };
 }
+
+module.exports = {
+  resolvePath,
+  networkInfo,
+  driverFromUrl,
+  loadConfig,
+  saveConfig,
+  dbDescriptor,
+  describeDb,
+  publicConfig,
+  ROOT,
+  PUBLIC_DIR,
+  DATA_DIR,
+  CONFIG_PATH,
+  VERSION,
+};

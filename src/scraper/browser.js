@@ -1,9 +1,8 @@
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import puppeteer from 'puppeteer-core';
-import { resolvePath } from '../config.js';
-
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const puppeteer = require('puppeteer-core');
+const { resolvePath } = require('../config');
 function candidates() {
   const home = os.homedir();
   const list = [];
@@ -39,7 +38,7 @@ function candidates() {
   return list;
 }
 
-export function findChrome(configured = '') {
+function findChrome(configured = '') {
   const checked = [];
   const explicit = configured || process.env.CHROME_PATH || '';
   if (explicit) {
@@ -55,7 +54,7 @@ export function findChrome(configured = '') {
   return { path: '', checked, source: 'none' };
 }
 
-export class BrowserManager {
+class BrowserManager {
   constructor({ getConfig, logger = console }) {
     this.getConfig = getConfig;
     this.logger = logger;
@@ -68,7 +67,7 @@ export class BrowserManager {
     const config = this.getConfig();
     const found = findChrome(config.scraper.chromePath);
     return {
-      running: Boolean(this.browser?.connected),
+      running: Boolean(this.browser && this.browser.isConnected()),
       path: found.path,
       configuredPath: config.scraper.chromePath || '',
       source: found.source,
@@ -79,15 +78,15 @@ export class BrowserManager {
   }
 
   async ensure() {
-    if (this.browser?.connected) return this.browser;
+    if (this.browser && this.browser.isConnected()) return this.browser;
     if (this.launching) return this.launching;
-    this.launching = this.#launch().finally(() => {
+    this.launching = this._launch().finally(() => {
       this.launching = null;
     });
     return this.launching;
   }
 
-  async #launch() {
+  async _launch() {
     const config = this.getConfig();
     const found = findChrome(config.scraper.chromePath);
     if (!found.path) {
@@ -102,6 +101,7 @@ export class BrowserManager {
       '--no-first-run',
       '--no-default-browser-check',
       '--disable-blink-features=AutomationControlled',
+      '--remote-allow-origins=*',
       '--disable-dev-shm-usage',
       '--disable-background-timer-throttling',
       '--disable-renderer-backgrounding',
@@ -119,7 +119,6 @@ export class BrowserManager {
         userDataDir: profileDir,
         args,
         defaultViewport: { width: 1440, height: 900 },
-        protocolTimeout: 180000,
         timeout: 60000,
       });
       browser.on('disconnected', () => {
@@ -133,7 +132,7 @@ export class BrowserManager {
       this.logger.log(`[browser] Chrome 已启动 (${found.path})`);
       return browser;
     } catch (err) {
-      this.lastError = String(err?.message || err);
+      this.lastError = String((err && err.message) || err);
       if (/SingletonLock|profile.*in use/i.test(this.lastError)) {
         throw new Error(`Chrome 用户目录被占用，请关闭残留的 Chrome 进程后重试。\n${this.lastError}`);
       }
@@ -164,3 +163,8 @@ export class BrowserManager {
     }
   }
 }
+
+module.exports = {
+  findChrome,
+  BrowserManager,
+};

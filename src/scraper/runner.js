@@ -1,11 +1,10 @@
-import { randomUUID } from 'node:crypto';
-import * as store from '../db/store.js';
-import { extractField, interpolate, interpolationMissing } from './extract.js';
-
+const { randomUUID, coalesce } = require('../util');
+const store = require('../db/store');
+const { extractField, interpolate, interpolationMissing } = require('./extract');
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export function humanizeError(err) {
-  const raw = String(err?.message || err || '未知错误');
+function humanizeError(err) {
+  const raw = String((err && err.message) || err || '未知错误');
   if (/net::ERR_NAME_NOT_RESOLVED/.test(raw)) return '域名解析失败（ERR_NAME_NOT_RESOLVED）';
   if (/net::ERR_CONNECTION_REFUSED/.test(raw)) return '目标站点拒绝连接（ERR_CONNECTION_REFUSED）';
   if (/net::ERR_CONNECTION_TIMED_OUT|Timeout of \d+ms exceeded|Navigation timeout/i.test(raw)) return '页面加载超时';
@@ -17,7 +16,7 @@ export function humanizeError(err) {
   return raw.split('\n')[0].slice(0, 800);
 }
 
-export function buildUrl(dataset, vars = {}) {
+function buildUrl(dataset, vars = {}) {
   const template = String(dataset.urlTemplate || '').trim();
   if (!template) throw new Error('该数据表还没有设置 URL 模板');
   const missing = interpolationMissing(template, vars);
@@ -37,13 +36,13 @@ function actionConfig(action = {}, vars = {}) {
   return {
     type: action.type,
     selector: interpolate(action.selector || '', vars, { encode: false }),
-    value: interpolate(action.value ?? action.text ?? '', vars, { encode: false }),
+    value: interpolate(coalesce(action.value, coalesce(action.text, '')), vars, { encode: false }),
     key: action.key || 'Enter',
     ms: Number(action.ms) || 0,
     x: Number(action.x) || 0,
     y: Number(action.y) || 0,
     code: interpolate(action.code || '', vars, { encode: false }),
-    delayMs: Number(action.delayMs ?? 80),
+    delayMs: Number(coalesce(action.delayMs, 80)),
   };
 }
 
@@ -100,7 +99,7 @@ async function runAction(page, action, vars, timeout) {
 async function autoScroll(page) {
   for (let i = 0; i < 30; i += 1) {
     const atBottom = await page.evaluate(
-      () => window.scrollY + window.innerHeight >= (document.documentElement?.scrollHeight || 0) - 8,
+      () => window.scrollY + window.innerHeight >= ((document.documentElement && document.documentElement.scrollHeight) || 0) - 8,
     );
     if (atBottom) break;
     await page.evaluate(() => window.scrollBy(0, 700));
@@ -113,7 +112,7 @@ async function autoScroll(page) {
  * Navigate a page for a dataset + entry and run every field template.
  * Returns extracted values keyed by field id and per-field errors.
  */
-export async function scrapeEntry(page, { dataset, vars, fields, timeoutMs }) {
+async function scrapeEntry(page, { dataset, vars, fields, timeoutMs }) {
   const settings = dataset.settings || {};
   const url = buildUrl(dataset, vars);
   const timeout = Number(settings.timeoutMs) || Number(timeoutMs) || 30000;
@@ -151,7 +150,7 @@ export async function scrapeEntry(page, { dataset, vars, fields, timeoutMs }) {
   return { values, errors, url: page.url(), title: await page.title().catch(() => '') };
 }
 
-export class RefreshService {
+class RefreshService {
   constructor({ getConfig, events, browser, logger = console }) {
     this.getConfig = getConfig;
     this.events = events;
@@ -179,7 +178,7 @@ export class RefreshService {
     return false;
   }
 
-  #acquire() {
+  _acquire() {
     if (this.active < this.limit) {
       this.active += 1;
       return Promise.resolve();
@@ -187,7 +186,7 @@ export class RefreshService {
     return new Promise((resolve) => this.waiters.push(resolve));
   }
 
-  #release() {
+  _release() {
     const next = this.waiters.shift();
     if (next) next();
     else this.active = Math.max(0, this.active - 1);
@@ -242,7 +241,7 @@ export class RefreshService {
         if (run.cancelled) return;
         const entry = list.shift();
         if (!entry) return;
-        await this.#runOne(run, dataset, fields, entry, source, timeoutMs);
+        await this._runOne(run, dataset, fields, entry, source, timeoutMs);
       }
     };
 
@@ -269,8 +268,8 @@ export class RefreshService {
     return run;
   }
 
-  async #runOne(run, dataset, fields, entry, source, timeoutMs) {
-    await this.#acquire();
+  async _runOne(run, dataset, fields, entry, source, timeoutMs) {
+    await this._acquire();
     this.busyEntries.add(entry.id);
     const startedAt = Date.now();
     let page = null;
@@ -305,7 +304,7 @@ export class RefreshService {
     } finally {
       if (page) await page.close().catch(() => {});
       this.busyEntries.delete(entry.id);
-      this.#release();
+      this._release();
     }
 
     const snapshot = {
@@ -335,3 +334,10 @@ export class RefreshService {
     }
   }
 }
+
+module.exports = {
+  humanizeError,
+  buildUrl,
+  scrapeEntry,
+  RefreshService,
+};

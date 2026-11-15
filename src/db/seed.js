@@ -1,8 +1,7 @@
-import { createDataset, createField, createEntry, getAppSetting, listDatasets, setAppSetting } from './store.js';
-
+const { createDataset, createField, createEntry, getAppSetting, listDatasets, setAppSetting } = require('./store');
 const SEED_KEY = 'demo_seeded_v1';
 
-export const DEMO_FIELDS = [
+const DEMO_FIELDS = [
   {
     name: '商品名称',
     dataType: 'text',
@@ -45,11 +44,11 @@ export const DEMO_FIELDS = [
   },
 ];
 
-export const DEMO_VARIABLES = [
+const DEMO_VARIABLES = [
   { key: 'asin', label: '商品 ASIN', placeholder: 'B0DEMO001', default: 'B0DEMO001', required: true },
 ];
 
-export function demoTablePayload(port) {
+function demoTablePayload(port) {
   return {
     name: '示例 · 商品价格追踪',
     icon: '🛍️',
@@ -68,7 +67,7 @@ export function demoTablePayload(port) {
   };
 }
 
-export async function seedDemo({ port }) {
+async function seedDemo({ port }) {
   const seeded = await getAppSetting(SEED_KEY);
   if (seeded) return null;
   const existing = await listDatasets();
@@ -87,3 +86,10 @@ export async function seedDemo({ port }) {
   await setAppSetting(SEED_KEY, new Date().toISOString());
   return table;
 }
+
+module.exports = {
+  demoTablePayload,
+  seedDemo,
+  DEMO_FIELDS,
+  DEMO_VARIABLES,
+};

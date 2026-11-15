@@ -1,11 +1,10 @@
-import { openSqlite } from './sqlite.js';
-import { openPostgres } from './postgres.js';
-import { openMysql } from './mysql.js';
-import { migrate } from './schema.js';
-
+const { openSqlite } = require('./sqlite');
+const { openPostgres } = require('./postgres');
+const { openMysql } = require('./mysql');
+const { migrate } = require('./schema');
 let active = null;
 
-export async function openDatabase(desc) {
+async function openDatabase(desc) {
   if (!desc || !desc.driver) throw new Error('缺少数据库配置');
   if (desc.driver === 'sqlite') {
     if (!desc.file) throw new Error('缺少 SQLite 文件路径');
@@ -23,7 +22,7 @@ export async function openDatabase(desc) {
 }
 
 /** Open + migrate the database, then make it the active connection. */
-export async function initDatabase(desc) {
+async function initDatabase(desc) {
   const next = await openDatabase(desc);
   try {
     await migrate(next);
@@ -38,7 +37,7 @@ export async function initDatabase(desc) {
 }
 
 /** Open a connection, verify it works, close it again. */
-export async function testDatabase(desc) {
+async function testDatabase(desc) {
   const db = await openDatabase(desc);
   try {
     await db.get('SELECT 1 AS ok');
@@ -49,17 +48,26 @@ export async function testDatabase(desc) {
   }
 }
 
-export function getDb() {
+function getDb() {
   if (!active) throw new Error('数据库尚未初始化');
   return active;
 }
 
-export function currentDbInfo() {
+function currentDbInfo() {
   return active ? active.info : null;
 }
 
-export async function closeDatabase() {
+async function closeDatabase() {
   const db = active;
   active = null;
   if (db) await db.close().catch(() => {});
 }
+
+module.exports = {
+  openDatabase,
+  initDatabase,
+  testDatabase,
+  getDb,
+  currentDbInfo,
+  closeDatabase,
+};

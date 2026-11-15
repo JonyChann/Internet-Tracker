@@ -1,33 +1,33 @@
-import { HttpError } from '../http.js';
-
-export function requireObject(value, label = '请求内容') {
+const { HttpError } = require('../http');
+const { coalesce } = require('../util');
+function requireObject(value, label = '请求内容') {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new HttpError(400, `${label}格式不正确`);
   }
   return value;
 }
 
-export function requireString(value, label, { max = 500, min = 1 } = {}) {
+function requireString(value, label, { max = 500, min = 1 } = {}) {
   const text = typeof value === 'string' ? value.trim() : '';
   if (text.length < min) throw new HttpError(400, `${label}不能为空`);
   if (text.length > max) throw new HttpError(400, `${label}过长（最多 ${max} 个字符）`);
   return text;
 }
 
-export function optionalString(value, label, { max = 500 } = {}) {
+function optionalString(value, label, { max = 500 } = {}) {
   if (value === null || value === undefined) return '';
   const text = String(value).trim();
   if (text.length > max) throw new HttpError(400, `${label}过长（最多 ${max} 个字符）`);
   return text;
 }
 
-export function clampInt(value, fallback, min, max) {
+function clampInt(value, fallback, min, max) {
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
   return Math.max(min, Math.min(max, Math.round(number)));
 }
 
-export function normalizeVariables(input) {
+function normalizeVariables(input) {
   if (input === null || input === undefined) return [];
   if (!Array.isArray(input)) throw new HttpError(400, '变量定义必须是数组');
   if (input.length > 12) throw new HttpError(400, '最多支持 12 个变量');
@@ -50,7 +50,7 @@ export function normalizeVariables(input) {
   });
 }
 
-export const ACTION_TYPES = [
+const ACTION_TYPES = [
   'click',
   'type',
   'fill',
@@ -63,9 +63,9 @@ export const ACTION_TYPES = [
   'eval',
 ];
 
-export const WAIT_UNTIL = ['domcontentloaded', 'load', 'networkidle0', 'networkidle2'];
+const WAIT_UNTIL = ['domcontentloaded', 'load', 'networkidle0', 'networkidle2'];
 
-export function defaultSettings() {
+function defaultSettings() {
   return {
     intervalSec: 0,
     waitUntil: 'domcontentloaded',
@@ -85,7 +85,7 @@ function normalizeAction(action) {
   return {
     type,
     selector: String(action.selector || '').slice(0, 2000),
-    value: String(action.value ?? action.text ?? '').slice(0, 2000),
+    value: String(coalesce(action.value, coalesce(action.text, ''))).slice(0, 2000),
     key: String(action.key || 'Enter').slice(0, 40),
     ms: clampInt(action.ms, 0, 0, 120000),
     x: clampInt(action.x, 0, -5000, 5000),
@@ -95,7 +95,7 @@ function normalizeAction(action) {
   };
 }
 
-export function normalizeSettings(input) {
+function normalizeSettings(input) {
   const base = defaultSettings();
   if (input === null || input === undefined) return base;
   if (typeof input !== 'object' || Array.isArray(input)) throw new HttpError(400, 'settings 格式不正确');
@@ -111,15 +111,29 @@ export function normalizeSettings(input) {
   };
 }
 
-export function sanitizeIcon(value) {
+function sanitizeIcon(value) {
   const text = String(value || '').trim();
   return text ? [...text].slice(0, 4).join('') : '📊';
 }
 
-export function validateUrlTemplate(template) {
+function validateUrlTemplate(template) {
   const text = String(template || '').trim();
   if (!text) return '';
   if (!/^https?:\/\//i.test(text)) throw new HttpError(400, 'URL 模板必须以 http:// 或 https:// 开头');
   if (text.length > 4000) throw new HttpError(400, 'URL 模板过长');
   return text;
 }
+
+module.exports = {
+  requireObject,
+  requireString,
+  optionalString,
+  clampInt,
+  normalizeVariables,
+  defaultSettings,
+  normalizeSettings,
+  sanitizeIcon,
+  validateUrlTemplate,
+  ACTION_TYPES,
+  WAIT_UNTIL,
+};

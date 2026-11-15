@@ -1,18 +1,9 @@
-import * as store from '../db/store.js';
-import { HttpError, sendJson } from '../http.js';
-import { normalizeTemplate, normalizeDataType } from '../scraper/extract.js';
-import { humanizeError, scrapeEntry } from '../scraper/runner.js';
-import {
-  normalizeSettings,
-  normalizeVariables,
-  optionalString,
-  requireObject,
-  requireString,
-  sanitizeIcon,
-  validateUrlTemplate,
-} from './helpers.js';
-
-export function registerTableRoutes(router, ctx) {
+const store = require('../db/store');
+const { HttpError, sendJson } = require('../http');
+const { normalizeTemplate, normalizeDataType } = require('../scraper/extract');
+const { humanizeError, scrapeEntry } = require('../scraper/runner');
+const { normalizeSettings, normalizeVariables, optionalString, requireObject, requireString, sanitizeIcon, validateUrlTemplate, } = require('./helpers');
+function registerTableRoutes(router, ctx) {
   const { getConfig, browser } = ctx;
 
   router.get('/api/tables', async ({ res }) => {
@@ -124,7 +115,7 @@ export function registerTableRoutes(router, ctx) {
         dataset,
         vars,
         fields,
-        timeoutMs: dataset.settings?.timeoutMs || getConfig().scraper.timeoutMs,
+        timeoutMs: (dataset.settings && dataset.settings.timeoutMs) || getConfig().scraper.timeoutMs,
       });
       const failed = Object.keys(result.errors).length;
       const status = failed === 0 ? 'ok' : failed === fields.length ? 'error' : 'partial';
@@ -203,3 +194,7 @@ export function registerTableRoutes(router, ctx) {
     sendJson(res, 201, { table: await store.getDataset(table.id), fields: created });
   });
 }
+
+module.exports = {
+  registerTableRoutes,
+};

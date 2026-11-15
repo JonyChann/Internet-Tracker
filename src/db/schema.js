@@ -20,7 +20,7 @@ function textDefault(dialect, literal) {
   return dialect === 'mysql' ? '' : ` DEFAULT ${literal}`;
 }
 
-export function schemaStatements(dialect) {
+function schemaStatements(dialect) {
   const t = types(dialect);
   const d = (literal) => textDefault(dialect, literal);
   const stmts = [
@@ -117,14 +117,19 @@ export function schemaStatements(dialect) {
   return stmts;
 }
 
-export async function migrate(db) {
+async function migrate(db) {
   for (const sql of schemaStatements(db.dialect)) {
     try {
       await db.exec(sql);
     } catch (err) {
-      const message = String(err?.message || err);
+      const message = String((err && err.message) || err);
       if (/Duplicate key name|already exists|relation .* already exists/i.test(message)) continue;
       throw new Error(`数据库初始化失败：${message}\nSQL: ${sql}`);
     }
   }
 }
+
+module.exports = {
+  schemaStatements,
+  migrate,
+};

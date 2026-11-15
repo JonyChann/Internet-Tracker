@@ -1,11 +1,10 @@
-import * as store from '../db/store.js';
-
+const store = require('../db/store');
 /**
  * Periodically scans datasets whose settings.intervalSec is > 0 and refreshes
  * every entry when the interval elapsed. Manual refreshes reset the clock
  * (lastRunAt is used as a fallback), so auto + manual do not double-fire.
  */
-export class Scheduler {
+class Scheduler {
   constructor({ getConfig, refresher, logger = console }) {
     this.getConfig = getConfig;
     this.refresher = refresher;
@@ -20,10 +19,10 @@ export class Scheduler {
     this.timer = setInterval(() => {
       this.tick().catch((err) => this.logger.error('[scheduler]', err));
     }, tickMs);
-    this.timer.unref?.();
+    if (this.timer.unref) this.timer.unref();
     setTimeout(() => {
       this.tick().catch((err) => this.logger.error('[scheduler]', err));
-    }, 1200).unref?.();
+    }, 1200).unref();
     this.logger.log(`[scheduler] 已启动，检查间隔 ${tickMs}ms`);
   }
 
@@ -41,9 +40,9 @@ export class Scheduler {
       const datasets = await store.listDatasets();
       const now = Date.now();
       for (const dataset of datasets) {
-        const intervalSec = Number(dataset.settings?.intervalSec || 0);
+        const intervalSec = Number((dataset.settings && dataset.settings.intervalSec) || 0);
         if (!intervalSec || intervalSec < 30) continue;
-        if (dataset.settings?.autoRefresh === false) continue;
+        if (dataset.settings && dataset.settings.autoRefresh === false) continue;
         const last = Date.parse(dataset.lastAutoAt || dataset.lastRunAt || dataset.createdAt || '') || 0;
         if (now - last < intervalSec * 1000) continue;
         if (this.refresher.isDatasetBusy(dataset.id)) continue;
@@ -62,3 +61,7 @@ export class Scheduler {
     }
   }
 }
+
+module.exports = {
+  Scheduler,
+};

@@ -1,11 +1,10 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { HttpError, sendJson } from '../http.js';
-import * as store from '../db/store.js';
-import { describeDb, dbDescriptor, publicConfig, resolvePath, networkInfo, VERSION, DATA_DIR, CONFIG_PATH } from '../config.js';
-import { initDatabase, testDatabase } from '../db/index.js';
-import { clampInt, optionalString, requireObject } from './helpers.js';
-
+const fs = require('fs');
+const path = require('path');
+const { HttpError, sendJson } = require('../http');
+const store = require('../db/store');
+const { describeDb, dbDescriptor, publicConfig, resolvePath, networkInfo, VERSION, DATA_DIR, CONFIG_PATH } = require('../config');
+const { initDatabase, testDatabase, getDb } = require('../db/index');
+const { clampInt, optionalString, requireObject } = require('./helpers');
 function dbPayload(body) {
   const payload = requireObject(body, '数据库配置');
   const driver = String(payload.driver || 'sqlite');
@@ -27,7 +26,7 @@ function dbPayload(body) {
   throw new HttpError(400, `不支持的数据库类型：${driver}`);
 }
 
-export function registerSettingsRoutes(router, ctx) {
+function registerSettingsRoutes(router, ctx) {
   const { getConfig, saveConfig, browser } = ctx;
 
   router.get('/api/health', async ({ res }) => {
@@ -190,15 +189,20 @@ export function registerSettingsRoutes(router, ctx) {
     if (!fs.existsSync(desc.file)) throw new HttpError(404, '数据库文件不存在');
     // Fold the WAL into the main file so the downloaded copy is complete.
     try {
-      await (await import('../db/index.js')).getDb().exec('PRAGMA wal_checkpoint(TRUNCATE)');
+      await getDb().exec('PRAGMA wal_checkpoint(TRUNCATE)');
     } catch {
       /* checkpoint is best effort */
     }
-    const stat = await fs.promises.stat(desc.file);
+    const stat = fs.statSync(desc.file);
     const filename = `internet-tracker-${new Date().toISOString().slice(0, 10)}.db`;
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', stat.size);
+    res.isStream = true;
     fs.createReadStream(desc.file).pipe(res);
   });
 }
+
+module.exports = {
+  registerSettingsRoutes,
+};

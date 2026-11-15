@@ -1,3 +1,5 @@
+const { coalesce } = require('../util');
+
 const EXTRACT_MODES = [
   'text',
   'html',
@@ -14,7 +16,7 @@ const EXTRACT_MODES = [
 
 const DATA_TYPES = ['text', 'number', 'date', 'url', 'image', 'json', 'boolean'];
 
-export function interpolationMissing(template, vars = {}) {
+function interpolationMissing(template, vars = {}) {
   const missing = [];
   const text = String(template || '');
   const regex = /\{\{\s*!?([\w.-]+)\s*\}\}/g;
@@ -31,8 +33,8 @@ export function interpolationMissing(template, vars = {}) {
  * Replace {{var}} placeholders. Values are URI encoded by default so they can
  * be dropped straight into a query string; use {{!var}} for raw insertion.
  */
-export function interpolate(template, vars = {}, { encode = true } = {}) {
-  return String(template ?? '').replace(/\{\{\s*(!?)([\w.-]+)\s*\}\}/g, (_, raw, key) => {
+function interpolate(template, vars = {}, { encode = true } = {}) {
+  return String(coalesce(template, '')).replace(/\{\{\s*(!?)([\w.-]+)\s*\}\}/g, (_, raw, key) => {
     const value = vars[key];
     if (value === undefined || value === null) return '';
     const text = String(value);
@@ -40,7 +42,7 @@ export function interpolate(template, vars = {}, { encode = true } = {}) {
   });
 }
 
-export function normalizeTemplate(input = {}) {
+function normalizeTemplate(input = {}) {
   const extract = EXTRACT_MODES.includes(input.extract) ? input.extract : 'text';
   const flags = String(input.regexFlags || '').replace(/[^gimsuy]/g, '');
   const template = {
@@ -62,11 +64,11 @@ export function normalizeTemplate(input = {}) {
   return template;
 }
 
-export function normalizeDataType(value) {
+function normalizeDataType(value) {
   return DATA_TYPES.includes(value) ? value : 'text';
 }
 
-export async function extractField(page, field, ctx = {}) {
+async function extractField(page, field, ctx = {}) {
   const tpl = field.template || {};
   const mode = tpl.extract || 'text';
   const vars = ctx.vars || {};
@@ -80,7 +82,7 @@ export async function extractField(page, field, ctx = {}) {
           const fn = new Function('vars', `"use strict";\n${source}`);
           const norm = (value) => {
             if (value === null || value === undefined) return null;
-            if (typeof value === 'object' && value.nodeType === 1) return value.innerText ?? value.textContent ?? '';
+            if (typeof value === 'object' && value.nodeType === 1) return value.innerText || value.textContent || '';
             if (Array.isArray(value)) return value.map(norm);
             if (typeof value === 'object') {
               try {
@@ -93,13 +95,13 @@ export async function extractField(page, field, ctx = {}) {
           };
           return { ok: true, value: norm(fn(variables)) };
         } catch (err) {
-          return { ok: false, error: String(err?.message || err) };
+          return { ok: false, error: String((err && err.message) || err) };
         }
       },
       code,
       vars,
     );
-    if (!result?.ok) throw new Error(`JS 提取失败：${result?.error || '未知错误'}`);
+    if (!result || !result.ok) throw new Error(`JS 提取失败：${(result && result.error) || '未知错误'}`);
     return coerceValue(postProcess(result.value, tpl, Array.isArray(result.value)), field, ctx);
   }
 
@@ -137,27 +139,27 @@ export async function extractField(page, field, ctx = {}) {
           case 'property':
             return tpl.attribute ? el[tpl.attribute] : null;
           case 'href':
-            return el.href ?? el.getAttribute('href');
+            return el.href || el.getAttribute('href');
           case 'src':
-            return el.src ?? el.getAttribute('src');
+            return el.src || el.getAttribute('src');
           case 'value':
-            return el.value ?? el.getAttribute('value') ?? '';
+            return el.value || el.getAttribute('value') || '';
           case 'text':
           default:
-            return el.innerText ?? el.textContent ?? '';
+            return el.innerText || el.textContent || '';
         }
       };
 
       if (tpl.extract === 'count') return { ok: true, value: elements.length };
       if (tpl.extract === 'exists') return { ok: true, value: elements.length > 0 };
       const values = elements.map(read);
-      return { ok: true, value: tpl.multiple ? values : values[0] ?? null };
+      return { ok: true, value: tpl.multiple ? values : (values[0] === undefined || values[0] === null ? null : values[0]) };
     },
     query,
     { xpath: isXPath, extract: mode, attribute: tpl.attribute, multiple: Boolean(tpl.multiple) },
   );
 
-  if (!raw?.ok) throw new Error(raw?.error || '提取失败');
+  if (!raw || !raw.ok) throw new Error((raw && raw.error) || '提取失败');
   const processed = postProcess(raw.value, tpl, Boolean(tpl.multiple));
   return coerceValue(processed, field, ctx);
 }
@@ -176,7 +178,7 @@ function postProcess(value, tpl, multiple) {
       const match = regex.exec(String(item));
       if (!match) return null;
       const group = Number.isInteger(tpl.regexGroup) ? tpl.regexGroup : 1;
-      out = match[group] ?? match[0] ?? null;
+      out = coalesce(match[group], coalesce(match[0], null));
       if (typeof out === 'string' && tpl.trim !== false) out = out.trim();
     }
     return out;
@@ -189,7 +191,7 @@ function postProcess(value, tpl, multiple) {
   return clean(value);
 }
 
-export function parseNumber(input) {
+function parseNumber(input) {
   if (typeof input === 'number') return Number.isFinite(input) ? input : null;
   if (input === null || input === undefined) return null;
   let text = String(input).trim();
@@ -255,9 +257,19 @@ function coerceValue(value, field, ctx) {
 }
 
 /** Human readable label for a value, used by exports. */
-export function stringifyValue(value) {
+function stringifyValue(value) {
   if (value === null || value === undefined) return '';
   if (Array.isArray(value)) return value.map(stringifyValue).join(' | ');
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 }
+
+module.exports = {
+  interpolationMissing,
+  interpolate,
+  normalizeTemplate,
+  normalizeDataType,
+  extractField,
+  parseNumber,
+  stringifyValue,
+};

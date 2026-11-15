@@ -1,15 +1,14 @@
-import * as store from '../db/store.js';
-import { HttpError } from '../http.js';
-import { buildSheets, exportFileName } from '../export/index.js';
-import { toCsv } from '../export/csv.js';
-import { buildXlsx } from '../export/xlsx.js';
-
+const store = require('../db/store');
+const { HttpError } = require('../http');
+const { buildSheets, exportFileName } = require('../export/index');
+const { toCsv } = require('../export/csv');
+const { buildXlsx } = require('../export/xlsx');
 function contentDisposition(filename) {
   const ascii = filename.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, "'");
   return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }
 
-export function registerExportRoutes(router) {
+function registerExportRoutes(router) {
   router.get('/api/export', async ({ res, query }) => {
     const tableId = String(query.tableId || '');
     if (!tableId) throw new HttpError(400, '缺少 tableId');
@@ -77,3 +76,7 @@ export function registerExportRoutes(router) {
     res.end(xlsx);
   });
 }
+
+module.exports = {
+  registerExportRoutes,
+};

@@ -2,17 +2,18 @@
   "name": "internet-tracker",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
-  "description": "Notion-like web scraping & tracking tool with Chrome automation",
+  "description": "Notion-like web scraping & tracking tool with Chrome automation (Node 10 LTS build)",
+  "license": "MIT",
   "scripts": {
-    "start": "node --experimental-sqlite src/server.js",
-    "dev": "node --experimental-sqlite --watch src/server.js",
-    "test": "node --experimental-sqlite --test"
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "test": "node tests/run.js"
   },
   "engines": {
-    "node": ">=22.13"
+    "node": ">=10.18.1"
   },
   "dependencies": {
-    "puppeteer-core": "^24.0.0"
+    "puppeteer-core": "^5.5.0",
+    "sql.js": "^1.8.0"
   }
 }

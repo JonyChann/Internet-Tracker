@@ -1,9 +1,8 @@
-import http from 'node:http';
-import fs from 'node:fs';
-import fsp from 'node:fs/promises';
-import path from 'node:path';
-
-export class HttpError extends Error {
+const http = require('http');
+const fs = require('fs');
+const { promisify } = require('util');
+const path = require('path');
+class HttpError extends Error {
   constructor(status, message, details) {
     super(message);
     this.status = status;
@@ -11,8 +10,10 @@ export class HttpError extends Error {
   }
 }
 
-export class Router {
-  #routes = [];
+class Router {
+  constructor() {
+    this.routes = [];
+  }
 
   add(method, pattern, handler) {
     const keys = [];
@@ -20,7 +21,7 @@ export class Router {
       keys.push(key);
       return '/([^/]+)';
     });
-    this.#routes.push({
+    this.routes.push({
       method,
       regex: new RegExp(`^${source}/?$`),
       keys,
@@ -51,7 +52,7 @@ export class Router {
 
   match(method, pathname) {
     const wanted = method === 'HEAD' ? 'GET' : method;
-    for (const route of this.#routes) {
+    for (const route of this.routes) {
       if (route.method !== wanted) continue;
       const match = pathname.match(route.regex);
       if (!match) continue;
@@ -65,11 +66,11 @@ export class Router {
   }
 }
 
-export class EventHub {
+class EventHub {
   constructor() {
     this.clients = new Set();
     this.timer = setInterval(() => this.ping(), 20000);
-    this.timer.unref?.();
+    if (this.timer.unref) this.timer.unref();
   }
 
   subscribe(req, res) {
@@ -89,7 +90,7 @@ export class EventHub {
     };
     req.on('close', cleanup);
     req.on('error', cleanup);
-    req.socket?.setTimeout?.(0);
+    if (req.socket && req.socket.setTimeout) req.socket.setTimeout(0);
   }
 
   send(client, type, data) {
@@ -134,7 +135,7 @@ export class EventHub {
   }
 }
 
-export function sendJson(res, status, data) {
+function sendJson(res, status, data) {
   const body = JSON.stringify(data);
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -144,7 +145,7 @@ export function sendJson(res, status, data) {
   res.end(body);
 }
 
-export function sendError(res, err) {
+function sendError(res, err) {
   const status = err instanceof HttpError ? err.status : 500;
   if (status >= 500) console.error('[http]', err);
   if (res.headersSent) {
@@ -180,7 +181,7 @@ function readBody(req, limit = 10 * 1024 * 1024) {
         return;
       }
       if (type === 'application/x-www-form-urlencoded') {
-        resolve(Object.fromEntries(new URLSearchParams(buffer.toString('utf8'))));
+        resolve(paramsObject(new URLSearchParams(buffer.toString('utf8'))));
         return;
       }
       resolve(buffer);
@@ -188,6 +189,16 @@ function readBody(req, limit = 10 * 1024 * 1024) {
     req.on('error', reject);
   });
 }
+
+function paramsObject(params) {
+  const out = {};
+  params.forEach((value, key) => {
+    out[key] = value;
+  });
+  return out;
+}
+
+const statAsync = promisify(fs.stat);
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -216,7 +227,7 @@ async function serveStatic(req, res, publicDir, pathname) {
 
   let stat;
   try {
-    stat = await fsp.stat(filePath);
+    stat = await statAsync(filePath);
   } catch {
     return false;
   }
@@ -237,7 +248,7 @@ async function serveStatic(req, res, publicDir, pathname) {
   return true;
 }
 
-export function createHttpServer({ router, publicDir, events, log = true }) {
+function createHttpServer({ router, publicDir, events, log = true }) {
   const server = http.createServer(async (req, res) => {
     const started = Date.now();
     const url = new URL(req.url || '/', `http://${req.headers.host || '127.0.0.1'}`);
@@ -285,12 +296,12 @@ export function createHttpServer({ router, publicDir, events, log = true }) {
           req,
           res,
           params: route.params,
-          query: Object.fromEntries(url.searchParams),
+          query: paramsObject(url.searchParams),
           body,
           url,
         };
         await route.handler(ctx);
-        if (!res.writableEnded && !res.isEventStream) res.end();
+        if (!res.writableEnded && !res.isEventStream && !res.isStream) res.end();
       } catch (err) {
         sendError(res, err);
       }
@@ -317,3 +328,12 @@ export function createHttpServer({ router, publicDir, events, log = true }) {
 
   return server;
 }
+
+module.exports = {
+  HttpError,
+  Router,
+  EventHub,
+  sendJson,
+  sendError,
+  createHttpServer,
+};

@@ -1,17 +1,13 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-import { VERSION, loadConfig, saveConfig, dbDescriptor, publicConfig, networkInfo } from './config.js';
-import { EventHub, Router, createHttpServer, sendJson } from './http.js';
-import { initDatabase, closeDatabase, currentDbInfo } from './db/index.js';
-import { seedDemo } from './db/seed.js';
-import { listDatasets, listEntries, listSnapshots, getDataset } from './db/store.js';
-import { BrowserManager } from './scraper/browser.js';
-import { RefreshService } from './scraper/runner.js';
-import { Scheduler } from './scraper/scheduler.js';
-import { registerApiRoutes } from './api/index.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const path = require('path');
+const { VERSION, loadConfig, saveConfig, dbDescriptor, publicConfig, networkInfo } = require('./config');
+const { EventHub, Router, createHttpServer, sendJson } = require('./http');
+const { initDatabase, closeDatabase, currentDbInfo } = require('./db/index');
+const { seedDemo } = require('./db/seed');
+const { listDatasets, listEntries, listSnapshots, getDataset } = require('./db/store');
+const { BrowserManager } = require('./scraper/browser');
+const { RefreshService } = require('./scraper/runner');
+const { Scheduler } = require('./scraper/scheduler');
+const { registerApiRoutes } = require('./api/index');
 const PUBLIC_DIR = path.resolve(__dirname, '..', 'public');
 
 function log(...args) {
