@@ -2,6 +2,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const puppeteer = require('puppeteer-core');
+const { execFileSync } = require('child_process');
 const { resolvePath } = require('../config');
 function candidates() {
   const home = os.homedir();
@@ -54,6 +55,90 @@ function findChrome(configured = '') {
   return { path: '', checked, source: 'none' };
 }
 
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function pidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return err.code === 'EPERM';
+  }
+}
+
+function pidLooksLikeChrome(pid) {
+  const probes = [
+    ['ps', ['-p', String(pid), '-o', 'comm=']],
+    ['lsof', ['-p', String(pid), '-Fn']],
+  ];
+  for (const [command, args] of probes) {
+    try {
+      const output = execFileSync(command, args, {
+        encoding: 'utf8',
+        timeout: 3000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      if (/chrome|chromium|msedge|brave/i.test(output)) return true;
+      if (output.trim()) return false;
+    } catch (err) {
+      // Command missing or blocked; try the next probe.
+    }
+  }
+  return null;
+}
+
+/**
+ * Chrome leaves SingletonLock behind when the browser is killed with the app.
+ * Remove a stale lock, and stop an orphaned Chrome that still owns our dedicated
+ * automation profile, otherwise every following launch fails with a 502.
+ */
+async function releaseProfileLock(profileDir, logger) {
+  const lockPath = path.join(profileDir, 'SingletonLock');
+  let target;
+  try {
+    target = fs.readlinkSync(lockPath);
+  } catch (err) {
+    return false;
+  }
+  const match = /^(.*)-(\d+)$/.exec(target);
+  if (!match) return false;
+  const host = match[1];
+  const pid = Number(match[2]);
+  if (host !== os.hostname()) return false;
+
+  if (pidAlive(pid)) {
+    const looksLikeChrome = pidLooksLikeChrome(pid);
+    // A different process reusing the PID means the lock itself is stale.
+    if (looksLikeChrome !== false) {
+      logger.log(`[browser] 发现残留的 Chrome 占用用户目录（PID ${pid}），正在结束它`);
+      try {
+        process.kill(pid, 'SIGTERM');
+      } catch (err) {
+        /* already gone */
+      }
+      for (let i = 0; i < 20 && pidAlive(pid); i += 1) await sleep(150);
+      if (pidAlive(pid)) {
+        try {
+          process.kill(pid, 'SIGKILL');
+        } catch (err) {
+          /* already gone */
+        }
+        await sleep(300);
+      }
+    }
+  }
+
+  for (const name of ['SingletonLock', 'SingletonSocket', 'SingletonCookie']) {
+    try {
+      fs.unlinkSync(path.join(profileDir, name));
+    } catch (err) {
+      /* not present */
+    }
+  }
+  return true;
+}
+
 class BrowserManager {
   constructor({ getConfig, logger = console }) {
     this.getConfig = getConfig;
@@ -96,6 +181,7 @@ class BrowserManager {
     }
     const profileDir = resolvePath(config.scraper.profileDir || path.join('data', 'chrome-profile'));
     fs.mkdirSync(profileDir, { recursive: true });
+    await releaseProfileLock(profileDir, this.logger);
 
     const args = [
       '--no-first-run',
@@ -112,8 +198,8 @@ class BrowserManager {
     if (config.scraper.noSandbox) args.push('--no-sandbox');
     if (config.scraper.headless) args.push('--hide-scrollbars', '--mute-audio');
 
-    try {
-      const browser = await puppeteer.launch({
+    const launch = () =>
+      puppeteer.launch({
         executablePath: found.path,
         headless: Boolean(config.scraper.headless),
         userDataDir: profileDir,
@@ -121,6 +207,18 @@ class BrowserManager {
         defaultViewport: { width: 1440, height: 900 },
         timeout: 60000,
       });
+
+    try {
+      let browser;
+      try {
+        browser = await launch();
+      } catch (launchError) {
+        const message = String((launchError && launchError.message) || launchError);
+        if (!/SingletonLock|ProcessSingleton|profile/i.test(message)) throw launchError;
+        // The previous instance may have died without closing Chrome.
+        await releaseProfileLock(profileDir, this.logger);
+        browser = await launch();
+      }
       browser.on('disconnected', () => {
         if (this.browser === browser) {
           this.browser = null;
